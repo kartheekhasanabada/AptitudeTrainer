@@ -5,6 +5,8 @@ import android.app.AlertDialog;
 import android.app.NotificationManager;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.view.Gravity;
@@ -26,11 +28,13 @@ public class TestActivity extends Activity {
     private boolean completed = false;
     private boolean active = false;
     private long endAtMillis;
+    private String testDifficulty = "Easy";
     private CountDownTimer timer;
     private LinearLayout root;
     private TextView header;
     private TextView timerView;
     private TextView questionView;
+    private TextView progressText;
     private RadioGroup optionsGroup;
     private Button prevBtn;
     private Button nextBtn;
@@ -43,15 +47,15 @@ public class TestActivity extends Activity {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         nm.cancel(Scheduler.NOTIFICATION_ID);
         SharedPreferences sp = getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE);
-        String difficulty = sp.getString("difficulty", "Easy");
+        testDifficulty = sp.getString("difficulty", "Easy");
         int count = sp.getInt("count", 5);
-        questions = QuestionBank.forDifficulty(difficulty, count);
+        questions = QuestionBank.forDifficulty(testDifficulty, count);
         selected = new int[questions.size()];
         for (int i = 0; i < selected.length; i++) selected[i] = -1;
         endAtMillis = System.currentTimeMillis() + Math.max(questions.size(), 1) * 60_000L;
         active = true;
         sp.edit().putBoolean("test_active", true).putBoolean("test_interrupted", false).apply();
-        try { startLockTask(); Toast.makeText(this, "Screen pinning started. Finish the test to exit.", Toast.LENGTH_LONG).show(); } catch (Exception ignored) {}
+        try { startLockTask(); Toast.makeText(this, "Focus mode started. Finish the test to exit.", Toast.LENGTH_LONG).show(); } catch (Exception ignored) {}
         buildTestUi();
         showQuestion();
         startTimer();
@@ -59,35 +63,47 @@ public class TestActivity extends Activity {
 
     private void buildTestUi() {
         ScrollView sv = new ScrollView(this);
+        if (Build.VERSION.SDK_INT >= 16) sv.setBackground(UiKit.screenBackground());
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(32, 32, 32, 32);
-        root.setBackgroundColor(Color.WHITE);
+        root.setPadding(UiKit.dp(20), UiKit.dp(22), UiKit.dp(20), UiKit.dp(28));
         sv.addView(root);
-        header = text("", 20, true);
-        timerView = text("", 16, true);
-        questionView = text("", 18, true);
-        root.addView(header);
-        root.addView(timerView);
-        root.addView(questionView);
+
+        LinearLayout top = UiKit.card(this);
+        header = UiKit.text(this, "", 22, UiKit.INK, true);
+        timerView = UiKit.text(this, "", 16, UiKit.HERMES_PURPLE, true);
+        progressText = UiKit.text(this, "", 13, UiKit.MUTED, false);
+        top.addView(UiKit.text(this, "FOCUS TEST", 12, UiKit.HERMES_BLUE, true));
+        top.addView(header);
+        top.addView(timerView);
+        top.addView(progressText);
+        root.addView(top);
+
+        LinearLayout qCard = UiKit.card(this);
+        questionView = UiKit.text(this, "", 19, UiKit.INK, true);
+        qCard.addView(questionView);
         optionsGroup = new RadioGroup(this);
         optionsGroup.setOrientation(RadioGroup.VERTICAL);
-        root.addView(optionsGroup);
+        qCard.addView(optionsGroup);
+        root.addView(qCard);
 
-        Button hintBtn = button("Show hint");
+        Button hintBtn = UiKit.secondaryButton(this, "Show hint");
         root.addView(hintBtn);
         hintBtn.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("Hint").setMessage(questions.get(index).hint).setPositiveButton("OK", null).show());
 
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        prevBtn = button("Previous");
-        nextBtn = button("Next");
-        finishBtn = button("Finish test");
-        row.addView(prevBtn);
-        row.addView(nextBtn);
+        prevBtn = UiKit.secondaryButton(this, "Previous");
+        nextBtn = UiKit.secondaryButton(this, "Next");
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(0, -2, 1);
+        btnLp.setMargins(UiKit.dp(4), UiKit.dp(8), UiKit.dp(4), UiKit.dp(8));
+        row.addView(prevBtn, btnLp);
+        row.addView(nextBtn, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(row);
+        finishBtn = UiKit.primaryButton(this, "Finish test");
         root.addView(finishBtn);
+
         prevBtn.setOnClickListener(v -> { saveSelected(); if (index > 0) { index--; showQuestion(); }});
         nextBtn.setOnClickListener(v -> { saveSelected(); if (index < questions.size()-1) { index++; showQuestion(); }});
         finishBtn.setOnClickListener(v -> confirmFinish());
@@ -110,15 +126,20 @@ public class TestActivity extends Activity {
 
     private void showQuestion() {
         Question q = questions.get(index);
-        header.setText(q.difficulty + " aptitude test • Question " + (index + 1) + " of " + questions.size());
-        questionView.setText("\n" + q.text + "\n");
+        header.setText(q.difficulty + " aptitude • Question " + (index + 1) + " of " + questions.size());
+        int answered = 0;
+        for (int s : selected) if (s >= 0) answered++;
+        progressText.setText("Answered " + answered + "/" + questions.size() + " • Screenshots blocked • Secure focus mode");
+        questionView.setText(q.text);
         optionsGroup.removeAllViews();
         for (int i=0; i<q.options.length; i++) {
             RadioButton rb = new RadioButton(this);
             rb.setText((char)('A' + i) + ". " + q.options[i]);
             rb.setTextSize(16);
+            rb.setTextColor(UiKit.INK);
+            rb.setTypeface(Typeface.DEFAULT_BOLD);
             rb.setId(100 + i);
-            rb.setPadding(0, 12, 0, 12);
+            rb.setPadding(UiKit.dp(8), UiKit.dp(14), UiKit.dp(8), UiKit.dp(14));
             optionsGroup.addView(rb);
         }
         if (selected[index] >= 0) optionsGroup.check(100 + selected[index]); else optionsGroup.clearCheck();
@@ -146,28 +167,45 @@ public class TestActivity extends Activity {
         active = false;
         if (timer != null) timer.cancel();
         try { stopLockTask(); } catch (Exception ignored) {}
+        int score = calculateScore();
+        ProgressStore.recordCompletedTest(this, testDifficulty, score, questions.size());
         getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE).edit().putBoolean("test_active", false).putBoolean("test_interrupted", false).apply();
-        showResults();
+        showResults(score);
     }
 
-    private void showResults() {
-        ScrollView sv = new ScrollView(this);
-        LinearLayout rr = new LinearLayout(this);
-        rr.setOrientation(LinearLayout.VERTICAL);
-        rr.setPadding(32, 32, 32, 32);
-        sv.addView(rr);
+    private int calculateScore() {
         int score = 0;
         for (int i=0; i<questions.size(); i++) if (selected[i] == questions.get(i).answerIndex) score++;
-        TextView title = text("Test completed: " + score + "/" + questions.size(), 26, true);
-        title.setTextColor(Color.rgb(0, 120, 80));
-        rr.addView(title);
+        return score;
+    }
+
+    private void showResults(int score) {
+        ScrollView sv = new ScrollView(this);
+        if (Build.VERSION.SDK_INT >= 16) sv.setBackground(UiKit.screenBackground());
+        LinearLayout rr = new LinearLayout(this);
+        rr.setOrientation(LinearLayout.VERTICAL);
+        rr.setPadding(UiKit.dp(20), UiKit.dp(22), UiKit.dp(20), UiKit.dp(28));
+        sv.addView(rr);
+
+        int percent = questions.isEmpty() ? 0 : Math.round(score * 100f / questions.size());
+        LinearLayout summary = UiKit.card(this);
+        TextView title = UiKit.text(this, "Test completed", 28, UiKit.INK, true);
+        TextView scoreView = UiKit.text(this, score + "/" + questions.size() + " • " + percent + "%", 32, percent >= 60 ? UiKit.HERMES_GREEN : UiKit.DANGER, true);
+        summary.addView(title);
+        summary.addView(scoreView);
+        summary.addView(UiKit.text(this, "Your dashboard has been updated.", 14, UiKit.MUTED, false));
+        rr.addView(summary);
+
         for (int i=0; i<questions.size(); i++) {
             Question q = questions.get(i);
-            TextView item = text("\nQ" + (i+1) + ". " + q.text + "\nYour answer: " + answerText(q, selected[i]) + "\nCorrect answer: " + answerText(q, q.answerIndex) + "\nExplanation: " + q.explanation, 15, false);
-            item.setTextColor(selected[i] == q.answerIndex ? Color.rgb(0, 100, 60) : Color.rgb(160, 40, 40));
+            LinearLayout item = UiKit.card(this);
+            boolean ok = selected[i] == q.answerIndex;
+            item.addView(UiKit.text(this, (ok ? "✓ Correct" : "✕ Review") + " • Q" + (i+1), 16, ok ? UiKit.HERMES_GREEN : UiKit.DANGER, true));
+            item.addView(UiKit.text(this, q.text, 15, UiKit.INK, true));
+            item.addView(UiKit.text(this, "Your answer: " + answerText(q, selected[i]) + "\nCorrect answer: " + answerText(q, q.answerIndex) + "\nExplanation: " + q.explanation, 14, UiKit.MUTED, false));
             rr.addView(item);
         }
-        Button done = button("Back to home");
+        Button done = UiKit.primaryButton(this, "Back to dashboard");
         rr.addView(done);
         done.setOnClickListener(v -> finish());
         setContentView(sv);
@@ -183,15 +221,20 @@ public class TestActivity extends Activity {
         active = false;
         if (timer != null) timer.cancel();
         try { stopLockTask(); } catch (Exception ignored) {}
+        ProgressStore.recordInterrupted(this);
         getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE).edit().putBoolean("test_active", false).putBoolean("test_interrupted", true).apply();
         LinearLayout ll = new LinearLayout(this);
+        if (Build.VERSION.SDK_INT >= 16) ll.setBackground(UiKit.screenBackground());
         ll.setOrientation(LinearLayout.VERTICAL);
-        ll.setPadding(40, 40, 40, 40);
-        TextView msg = text("Test stopped", 26, true);
-        msg.setTextColor(Color.rgb(180, 40, 40));
-        ll.addView(msg);
-        ll.addView(text("The test was closed before completion, so this attempt has been stopped. Start a new test from the home screen.", 17, false));
-        Button b = button("Close"); ll.addView(b); b.setOnClickListener(v -> finish());
+        ll.setPadding(UiKit.dp(30), UiKit.dp(36), UiKit.dp(30), UiKit.dp(36));
+        LinearLayout card = UiKit.card(this);
+        TextView msg = UiKit.text(this, "Test stopped", 28, UiKit.DANGER, true);
+        card.addView(msg);
+        card.addView(UiKit.text(this, "The test was closed before completion, so this attempt has been stopped and recorded as interrupted.", 16, UiKit.MUTED, false));
+        Button b = UiKit.primaryButton(this, "Back to dashboard");
+        card.addView(b);
+        ll.addView(card);
+        b.setOnClickListener(v -> finish());
         setContentView(ll);
     }
 
@@ -205,7 +248,4 @@ public class TestActivity extends Activity {
             showInterrupted();
         }
     }
-
-    private TextView text(String s, int sp, boolean bold) { TextView t = new TextView(this); t.setText(s); t.setTextSize(sp); t.setTextColor(Color.rgb(30, 35, 45)); if (bold) t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); return t; }
-    private Button button(String s) { Button b = new Button(this); b.setText(s); b.setAllCaps(false); return b; }
 }

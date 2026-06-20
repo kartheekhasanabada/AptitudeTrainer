@@ -18,6 +18,8 @@ After this project is uploaded to GitHub, Android users can download the app fro
 
 ## Features
 
+- Apple-glass/Hermes-inspired UI with soft gradients, translucent cards, rounded controls, and a polished dashboard.
+- Student dashboard showing completed tests, average score, best score, day streak, last test result, solved question count, and interrupted attempts.
 - Daily fixed-time aptitude test scheduling.
 - Scheduled test opens using exact alarms and a full-screen notification.
 - Easy, Medium, and Hard question levels.
