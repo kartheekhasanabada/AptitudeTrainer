@@ -8,8 +8,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
@@ -70,6 +72,24 @@ public class MainActivity extends Activity {
             if (!am.canScheduleExactAlarms()) {
                 try { startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)); } catch (Exception ignored) {}
             }
+        }
+        if (Build.VERSION.SDK_INT >= 34) {
+            android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm != null && !nm.canUseFullScreenIntent()) {
+                try {
+                    Intent i = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT);
+                    i.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(i);
+                } catch (Exception ignored) {}
+            }
+        }
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        if (pm != null && Build.VERSION.SDK_INT >= 23 && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+            try {
+                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                i.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(i);
+            } catch (Exception ignored) {}
         }
     }
 

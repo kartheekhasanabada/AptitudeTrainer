@@ -16,6 +16,7 @@ public final class Scheduler {
     public static final String PREFS = "secure_aptitude_prefs";
     public static final String CHANNEL_ID = "daily_test_channel";
     public static final int ALARM_REQUEST = 2001;
+    public static final int ALARM_SHOW_REQUEST = 2002;
     public static final int NOTIFICATION_ID = 301;
 
     private Scheduler() {}
@@ -25,6 +26,9 @@ public final class Scheduler {
             NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "Daily aptitude test", NotificationManager.IMPORTANCE_HIGH);
             ch.setDescription("Opens the scheduled aptitude test at your selected time.");
             ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+            ch.enableVibration(true);
+            ch.enableLights(true);
+            ch.setBypassDnd(true);
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             nm.createNotificationChannel(ch);
         }
@@ -57,22 +61,31 @@ public final class Scheduler {
 
         Intent intent = new Intent(ctx, AlarmReceiver.class);
         intent.setAction("com.karth.aptitudetrainer.START_TEST");
-        PendingIntent pi = PendingIntent.getBroadcast(ctx, ALARM_REQUEST, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent pi = PendingIntent.getBroadcast(ctx, ALARM_REQUEST, intent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent show = new Intent(ctx, MainActivity.class);
+        show.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent showPi = PendingIntent.getActivity(ctx, ALARM_SHOW_REQUEST, show, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), pi);
-        } else {
+        if (am == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            am.setAlarmClock(new AlarmManager.AlarmClockInfo(c.getTimeInMillis(), showPi), pi);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), pi);
+        } else {
+            am.setExact(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), pi);
         }
     }
 
     public static void cancelSchedule(Context ctx) {
         Intent intent = new Intent(ctx, AlarmReceiver.class);
         intent.setAction("com.karth.aptitudetrainer.START_TEST");
-        PendingIntent pi = PendingIntent.getBroadcast(ctx, ALARM_REQUEST, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent pi = PendingIntent.getBroadcast(ctx, ALARM_REQUEST, intent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent show = new Intent(ctx, MainActivity.class);
+        PendingIntent showPi = PendingIntent.getActivity(ctx, ALARM_SHOW_REQUEST, show, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (am != null) am.cancel(pi);
         pi.cancel();
+        showPi.cancel();
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm != null) nm.cancel(NOTIFICATION_ID);
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

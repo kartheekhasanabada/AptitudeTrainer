@@ -5,6 +5,8 @@ import android.app.AlertDialog;
 import android.app.NotificationManager;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
+import android.app.KeyguardManager;
+import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
@@ -47,6 +49,12 @@ public class TestActivity extends Activity {
         super.onCreate(b);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true);
+            setTurnScreenOn(true);
+            KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+            if (km != null) km.requestDismissKeyguard(this, null);
+        }
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         nm.cancel(Scheduler.NOTIFICATION_ID);
         SharedPreferences sp = getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE);
