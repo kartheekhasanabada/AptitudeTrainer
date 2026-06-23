@@ -176,8 +176,10 @@ public class MainActivity extends Activity {
         actions.setPadding(0, UiKit.dp(18), 0, 0);
         Button save = UiKit.primaryButton(this, "Save schedule");
         Button startNow = UiKit.secondaryButton(this, "Start practice test now");
+        Button cancelSchedule = UiKit.dangerButton(this, "Cancel schedule");
         actions.addView(save);
         actions.addView(startNow);
+        actions.addView(cancelSchedule);
         scheduleCard.addView(actions);
 
         save.setOnClickListener(v -> {
@@ -186,6 +188,12 @@ public class MainActivity extends Activity {
             Scheduler.saveSchedule(this, selectedHour, selectedMinute, selectedDifficulty, selectedCompany, selectedCount);
             scheduleText.setText(Scheduler.scheduleSummary(this));
             Toast.makeText(this, "Daily " + selectedCompany + " test scheduled with " + selectedCount + " questions", Toast.LENGTH_LONG).show();
+        });
+        cancelSchedule.setOnClickListener(v -> {
+            UiKit.pulseOnce(cancelSchedule);
+            Scheduler.cancelSchedule(this);
+            scheduleText.setText(Scheduler.scheduleSummary(this));
+            Toast.makeText(this, "Daily test schedule cancelled", Toast.LENGTH_LONG).show();
         });
         startNow.setOnClickListener(v -> {
             UiKit.pulseOnce(startNow);
@@ -216,8 +224,22 @@ public class MainActivity extends Activity {
     private void refreshDashboard() {
         dashboardCard.removeAllViews();
         ProgressStore.Snapshot p = ProgressStore.snapshot(this);
-        dashboardCard.addView(UiKit.text(this, "Student Dashboard", 22, UiKit.INK, true));
-        dashboardCard.addView(UiKit.text(this, "Your private progress summary on this phone.", 14, UiKit.MUTED, false));
+        dashboardCard.addView(UiKit.text(this, "Learning Dashboard", 24, UiKit.INK, true));
+        dashboardCard.addView(UiKit.text(this, "A clean practice view for consistency, focus, and interview readiness.", 14, UiKit.MUTED, false));
+
+        LinearLayout focus = new LinearLayout(this);
+        focus.setOrientation(LinearLayout.VERTICAL);
+        focus.setPadding(UiKit.dp(14), UiKit.dp(12), UiKit.dp(14), UiKit.dp(12));
+        if (Build.VERSION.SDK_INT >= 16) focus.setBackground(UiKit.learningGlass(UiKit.HERMES_BLUE));
+        TextView focusTitle = UiKit.text(this, "Today's Focus", 13, UiKit.MUTED, true);
+        TextView focusValue = UiKit.text(this, selectedCompany + " • " + selectedDifficulty + " • " + selectedCount + " questions", 18, UiKit.HERMES_BLUE, true);
+        TextView focusHint = UiKit.text(this, "Keep your streak alive with one focused session.", 13, UiKit.MUTED, false);
+        focus.addView(focusTitle);
+        focus.addView(focusValue);
+        focus.addView(focusHint);
+        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, -2);
+        focusLp.setMargins(0, UiKit.dp(12), 0, UiKit.dp(8));
+        dashboardCard.addView(focus, focusLp);
 
         LinearLayout row1 = new LinearLayout(this);
         row1.setOrientation(LinearLayout.HORIZONTAL);
@@ -228,8 +250,14 @@ public class MainActivity extends Activity {
         LinearLayout row2 = new LinearLayout(this);
         row2.setOrientation(LinearLayout.HORIZONTAL);
         row2.addView(UiKit.metricCard(this, p.bestPercent + "%", "Best", UiKit.HERMES_PURPLE));
-        row2.addView(UiKit.metricCard(this, String.valueOf(p.streak), "Day streak", Color.rgb(255, 145, 50)));
+        row2.addView(UiKit.metricCard(this, String.valueOf(p.streak), "Day streak", UiKit.LEARNING_GOLD));
         dashboardCard.addView(row2);
+
+        LinearLayout row3 = new LinearLayout(this);
+        row3.setOrientation(LinearLayout.HORIZONTAL);
+        row3.addView(UiKit.learningTile(this, "Questions Solved", String.valueOf(p.questions), UiKit.HERMES_PURPLE));
+        row3.addView(UiKit.learningTile(this, "Accuracy Count", String.valueOf(p.correct), UiKit.LEARNING_PINK));
+        dashboardCard.addView(row3);
 
         TextView last = UiKit.text(this, "Last test: " + p.lastDifficulty + " • " + (p.lastTotal == 0 ? "No score yet" : p.lastScore + "/" + p.lastTotal + " (" + p.lastPercent + "%)") + "\n" + p.lastTime, 14, UiKit.MUTED, false);
         last.setPadding(0, UiKit.dp(10), 0, UiKit.dp(6));
@@ -239,7 +267,7 @@ public class MainActivity extends Activity {
         bar.setMax(100);
         bar.setProgress(p.averagePercent);
         dashboardCard.addView(bar, new LinearLayout.LayoutParams(-1, UiKit.dp(12)));
-        TextView details = UiKit.text(this, "Solved correctly: " + p.correct + "/" + p.questions + " questions • Interrupted attempts: " + p.interrupted, 13, UiKit.MUTED, false);
+        TextView details = UiKit.text(this, "Correct answers: " + p.correct + "/" + p.questions + " • Interrupted attempts: " + p.interrupted, 13, UiKit.MUTED, false);
         details.setPadding(0, UiKit.dp(8), 0, 0);
         dashboardCard.addView(details);
     }

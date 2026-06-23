@@ -66,6 +66,21 @@ public final class Scheduler {
         }
     }
 
+    public static void cancelSchedule(Context ctx) {
+        Intent intent = new Intent(ctx, AlarmReceiver.class);
+        intent.setAction("com.karth.aptitudetrainer.START_TEST");
+        PendingIntent pi = PendingIntent.getBroadcast(ctx, ALARM_REQUEST, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        if (am != null) am.cancel(pi);
+        pi.cancel();
+        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm != null) nm.cancel(NOTIFICATION_ID);
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("scheduled", false)
+                .apply();
+    }
+
     public static Intent exactAlarmSettingsIntent() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
         return null;

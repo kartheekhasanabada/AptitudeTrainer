@@ -18,36 +18,48 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public final class UiKit {
-    public static final int BG_TOP = Color.rgb(246, 250, 255);
-    public static final int BG_BOTTOM = Color.rgb(239, 245, 242);
+    public static final int BG_TOP = Color.rgb(238, 247, 255);
+    public static final int BG_BOTTOM = Color.rgb(240, 249, 245);
     public static final int INK = Color.rgb(18, 23, 31);
     public static final int MUTED = Color.rgb(86, 95, 109);
     public static final int HERMES_BLUE = Color.rgb(0, 113, 227);
     public static final int HERMES_PURPLE = Color.rgb(112, 92, 232);
     public static final int HERMES_GREEN = Color.rgb(0, 168, 120);
+    public static final int LEARNING_GOLD = Color.rgb(255, 179, 64);
+    public static final int LEARNING_PINK = Color.rgb(255, 90, 132);
     public static final int CODE_APT_CYAN = Color.rgb(0, 180, 216);
     public static final int DANGER = Color.rgb(222, 68, 90);
 
     private UiKit() {}
 
     public static GradientDrawable screenBackground() {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{BG_TOP, Color.WHITE, BG_BOTTOM, Color.rgb(250, 248, 255)});
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{BG_TOP, Color.WHITE, Color.rgb(244, 241, 255), BG_BOTTOM});
         g.setGradientType(GradientDrawable.LINEAR_GRADIENT);
         return g;
     }
 
     public static GradientDrawable glassCard() {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.argb(224, 255, 255, 255));
-        g.setStroke(dp(1), Color.argb(165, 255, 255, 255));
+        g.setColor(Color.argb(214, 255, 255, 255));
+        g.setStroke(dp(1), Color.argb(185, 255, 255, 255));
         g.setCornerRadius(dp(8));
         return g;
     }
 
     public static GradientDrawable subtleCard() {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.argb(218, 255, 255, 255));
-        g.setStroke(dp(1), Color.argb(90, 130, 150, 190));
+        g.setColor(Color.argb(205, 255, 255, 255));
+        g.setStroke(dp(1), Color.argb(105, 145, 165, 205));
+        g.setCornerRadius(dp(8));
+        return g;
+    }
+
+    public static GradientDrawable learningGlass(int accent) {
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
+                Color.argb(232, 255, 255, 255),
+                Color.argb(176, Color.red(blend(accent, Color.WHITE, 0.72f)), Color.green(blend(accent, Color.WHITE, 0.72f)), Color.blue(blend(accent, Color.WHITE, 0.72f)))
+        });
+        g.setStroke(dp(1), Color.argb(150, 255, 255, 255));
         g.setCornerRadius(dp(8));
         return g;
     }
@@ -68,8 +80,16 @@ public final class UiKit {
 
     public static GradientDrawable outlinePill() {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.argb(215, 255, 255, 255));
-        g.setStroke(dp(1), Color.argb(110, 42, 96, 255));
+        g.setColor(Color.argb(188, 255, 255, 255));
+        g.setStroke(dp(1), Color.argb(120, 0, 113, 227));
+        g.setCornerRadius(dp(999));
+        return g;
+    }
+
+    public static GradientDrawable dangerOutlinePill() {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.argb(190, 255, 255, 255));
+        g.setStroke(dp(1), Color.argb(150, Color.red(DANGER), Color.green(DANGER), Color.blue(DANGER)));
         g.setCornerRadius(dp(999));
         return g;
     }
@@ -139,13 +159,26 @@ public final class UiKit {
         return b;
     }
 
+    public static Button dangerButton(Context c, String s) {
+        Button b = new Button(c);
+        b.setText(s);
+        b.setTextColor(DANGER);
+        b.setTextSize(responsiveSp(c, 15));
+        b.setTypeface(Typeface.DEFAULT_BOLD);
+        b.setAllCaps(false);
+        b.setPadding(dp(16), dp(12), dp(16), dp(12));
+        if (Build.VERSION.SDK_INT >= 16) b.setBackground(dangerOutlinePill());
+        b.setMinHeight(dp(48));
+        return b;
+    }
+
     public static LinearLayout card(Context c) {
         LinearLayout card = new LinearLayout(c);
         card.setOrientation(LinearLayout.VERTICAL);
         int pad = contentPadding(c) - dp(2);
         card.setPadding(pad, pad, pad, pad);
         if (Build.VERSION.SDK_INT >= 16) card.setBackground(glassCard());
-        if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(3));
+        if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(4));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(10), 0, dp(10));
         card.setLayoutParams(lp);
@@ -163,6 +196,22 @@ public final class UiKit {
         box.addView(l);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
         lp.setMargins(dp(4), dp(4), dp(4), dp(4));
+        box.setLayoutParams(lp);
+        return box;
+    }
+
+    public static LinearLayout learningTile(Context c, String title, String value, int accent) {
+        LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(14), dp(12), dp(14), dp(12));
+        if (Build.VERSION.SDK_INT >= 16) box.setBackground(learningGlass(accent));
+        if (Build.VERSION.SDK_INT >= 21) box.setElevation(dp(2));
+        TextView titleView = text(c, title, 12, MUTED, true);
+        TextView valueView = text(c, value, 19, accent, true);
+        box.addView(titleView);
+        box.addView(valueView);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+        lp.setMargins(dp(4), dp(6), dp(4), dp(6));
         box.setLayoutParams(lp);
         return box;
     }
