@@ -30,9 +30,16 @@ public final class Scheduler {
         }
     }
 
-    public static void saveSchedule(Context ctx, int hour, int minute, String difficulty, int count) {
+    public static void saveSchedule(Context ctx, int hour, int minute, String difficulty, String company, int count) {
         SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        sp.edit().putInt("hour", hour).putInt("minute", minute).putString("difficulty", difficulty).putInt("count", count).putBoolean("scheduled", true).apply();
+        sp.edit()
+                .putInt("hour", hour)
+                .putInt("minute", minute)
+                .putString("difficulty", difficulty)
+                .putString("company", QuestionBank.normalizeCompany(company))
+                .putInt("count", count)
+                .putBoolean("scheduled", true)
+                .apply();
         scheduleNext(ctx);
     }
 
@@ -67,6 +74,11 @@ public final class Scheduler {
     public static String scheduleSummary(Context ctx) {
         SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         if (!sp.getBoolean("scheduled", false)) return "No daily test scheduled yet.";
-        return String.format("Daily test: %02d:%02d • %s • %d questions", sp.getInt("hour", 7), sp.getInt("minute", 0), sp.getString("difficulty", "Easy"), sp.getInt("count", 5));
+        return String.format("Daily test: %02d:%02d • %s • %s • %d questions",
+                sp.getInt("hour", 7),
+                sp.getInt("minute", 0),
+                sp.getString("difficulty", "Easy"),
+                sp.getString("company", QuestionBank.ALL_COMPANIES),
+                sp.getInt("count", 5));
     }
 }

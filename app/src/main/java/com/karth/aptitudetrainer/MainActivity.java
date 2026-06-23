@@ -11,11 +11,13 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -25,12 +27,15 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
+    private static final int MAX_TEST_QUESTIONS = 10000;
     private int selectedHour = 7;
     private int selectedMinute = 0;
     private String selectedDifficulty = "Easy";
+    private String selectedCompany = QuestionBank.ALL_COMPANIES;
     private int selectedCount = 5;
     private TextView scheduleText;
     private TextView countHint;
+    private EditText countInput;
     private LinearLayout dashboardCard;
 
     @Override protected void onCreate(Bundle b) {
@@ -52,7 +57,8 @@ public class MainActivity extends Activity {
         selectedHour = sp.getInt("hour", 7);
         selectedMinute = sp.getInt("minute", 0);
         selectedDifficulty = sp.getString("difficulty", "Easy");
-        selectedCount = sp.getInt("count", 5);
+        selectedCompany = QuestionBank.normalizeCompany(sp.getString("company", QuestionBank.ALL_COMPANIES));
+        selectedCount = clampQuestionCount(sp.getInt("count", 5));
     }
 
     private void requestImportantPermissions() {
@@ -136,16 +142,31 @@ public class MainActivity extends Activity {
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        scheduleCard.addView(sectionLabel("Number of questions"));
-        Spinner count = new Spinner(this);
-        Integer[] counts = new Integer[]{5, 10};
-        count.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, counts));
-        count.setSelection(selectedCount >= 10 ? 1 : 0);
-        scheduleCard.addView(count);
-        count.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { selectedCount = counts[position]; }
+        scheduleCard.addView(sectionLabel("Company focus"));
+        Spinner company = new Spinner(this);
+        String[] companies = QuestionBank.companyChoices();
+        company.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, companies));
+        company.setSelection(indexOf(companies, selectedCompany));
+        scheduleCard.addView(company);
+        company.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedCompany = companies[position];
+                updateCountHint();
+            }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
+
+        scheduleCard.addView(sectionLabel("Number of questions"));
+        countInput = new EditText(this);
+        countInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        countInput.setSingleLine(true);
+        countInput.setText(String.valueOf(selectedCount));
+        countInput.setTextSize(UiKit.responsiveSp(this, 18));
+        countInput.setTextColor(UiKit.INK);
+        countInput.setHint("Enter questions");
+        countInput.setPadding(UiKit.dp(14), UiKit.dp(12), UiKit.dp(14), UiKit.dp(12));
+        if (Build.VERSION.SDK_INT >= 16) countInput.setBackground(UiKit.inputBackground());
+        scheduleCard.addView(countInput, new LinearLayout.LayoutParams(-1, -2));
         countHint = UiKit.text(this, "", 13, UiKit.MUTED, false);
         scheduleCard.addView(countHint);
         updateCountHint();
@@ -161,13 +182,20 @@ public class MainActivity extends Activity {
 
         save.setOnClickListener(v -> {
             UiKit.pulseOnce(save);
-            Scheduler.saveSchedule(this, selectedHour, selectedMinute, selectedDifficulty, selectedCount);
+            selectedCount = readRequestedCount();
+            Scheduler.saveSchedule(this, selectedHour, selectedMinute, selectedDifficulty, selectedCompany, selectedCount);
             scheduleText.setText(Scheduler.scheduleSummary(this));
-            Toast.makeText(this, "Daily test scheduled securely", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Daily " + selectedCompany + " test scheduled with " + selectedCount + " questions", Toast.LENGTH_LONG).show();
         });
         startNow.setOnClickListener(v -> {
             UiKit.pulseOnce(startNow);
-            getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE).edit().putString("difficulty", selectedDifficulty).putInt("count", selectedCount).apply();
+            selectedCount = readRequestedCount();
+            getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE)
+                    .edit()
+                    .putString("difficulty", selectedDifficulty)
+                    .putString("company", selectedCompany)
+                    .putInt("count", selectedCount)
+                    .apply();
             Intent it = new Intent(this, TestActivity.class);
             it.putExtra("scheduled", false);
             startActivity(it);
@@ -218,10 +246,40 @@ public class MainActivity extends Activity {
 
     private void updateCountHint() {
         if (countHint != null) {
-            int total = QuestionBank.countForDifficulty(selectedDifficulty);
-            int fresh = ProgressStore.unseenCountForDifficulty(this, selectedDifficulty);
-            countHint.setText("New " + selectedDifficulty + " questions left: " + fresh + "/" + total + ". Seen questions will not be asked again.");
+            int total = QuestionBank.countForDifficulty(selectedDifficulty, selectedCompany);
+            int fresh = ProgressStore.unseenCountForPractice(this, selectedDifficulty, selectedCompany);
+            String focus = QuestionBank.ALL_COMPANIES.equals(selectedCompany) ? "mixed company" : selectedCompany;
+            countHint.setText("Fresh " + selectedDifficulty + " " + focus + " questions: " + fresh + "/" + total + ". Type any test size up to " + MAX_TEST_QUESTIONS + ".");
         }
+    }
+
+    private int readRequestedCount() {
+        int requested = selectedCount;
+        if (countInput != null) {
+            try {
+                requested = Integer.parseInt(countInput.getText().toString().trim());
+            } catch (Exception ignored) {
+                requested = selectedCount;
+            }
+        }
+        int clamped = clampQuestionCount(requested);
+        if (countInput != null && clamped != requested) {
+            countInput.setText(String.valueOf(clamped));
+            Toast.makeText(this, "Question count adjusted to " + clamped, Toast.LENGTH_SHORT).show();
+        }
+        return clamped;
+    }
+
+    private int clampQuestionCount(int count) {
+        if (count < 1) return 1;
+        return Math.min(count, MAX_TEST_QUESTIONS);
+    }
+
+    private int indexOf(String[] values, String selected) {
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equalsIgnoreCase(selected)) return i;
+        }
+        return 0;
     }
 
     private TextView sectionLabel(String s) { TextView t = UiKit.text(this, s, 15, UiKit.INK, true); t.setPadding(0, UiKit.dp(18), 0, UiKit.dp(6)); return t; }

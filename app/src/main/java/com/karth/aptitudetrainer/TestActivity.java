@@ -21,6 +21,7 @@ import android.widget.Toast;
 import java.util.List;
 
 public class TestActivity extends Activity {
+    private static final int MAX_TEST_QUESTIONS = 10000;
     private List<Question> questions;
     private int[] selected;
     private int index = 0;
@@ -28,6 +29,7 @@ public class TestActivity extends Activity {
     private boolean active = false;
     private long endAtMillis;
     private String testDifficulty = "Easy";
+    private String testCompany = QuestionBank.ALL_COMPANIES;
     private CountDownTimer timer;
     private LinearLayout root;
     private LinearLayout questionCard;
@@ -49,12 +51,9 @@ public class TestActivity extends Activity {
         nm.cancel(Scheduler.NOTIFICATION_ID);
         SharedPreferences sp = getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE);
         testDifficulty = sp.getString("difficulty", "Easy");
-        int count = sp.getInt("count", 5);
-        questions = QuestionBank.forDifficulty(testDifficulty, count, ProgressStore.askedQuestionIds(this));
-        if (questions.isEmpty()) {
-            showNoFreshQuestions();
-            return;
-        }
+        testCompany = QuestionBank.normalizeCompany(sp.getString("company", QuestionBank.ALL_COMPANIES));
+        int count = clampQuestionCount(sp.getInt("count", 5));
+        questions = QuestionBank.forPractice(testDifficulty, testCompany, count, ProgressStore.askedQuestionIds(this));
         ProgressStore.recordAskedQuestions(this, questions);
         selected = new int[questions.size()];
         for (int i = 0; i < selected.length; i++) selected[i] = -1;
@@ -131,24 +130,6 @@ public class TestActivity extends Activity {
         setContentView(sv);
     }
 
-    private void showNoFreshQuestions() {
-        completed = true;
-        active = false;
-        LinearLayout ll = new LinearLayout(this);
-        if (Build.VERSION.SDK_INT >= 16) ll.setBackground(UiKit.screenBackground());
-        ll.setOrientation(LinearLayout.VERTICAL);
-        ll.setPadding(UiKit.dp(30), UiKit.dp(36), UiKit.dp(30), UiKit.dp(36));
-        LinearLayout card = UiKit.card(this);
-        card.addView(UiKit.poweredByLabel(this));
-        card.addView(UiKit.text(this, "No new questions left", 28, UiKit.INK, true));
-        card.addView(UiKit.text(this, "You have already seen every " + testDifficulty + " question in this app, so this test was not started.", 16, UiKit.MUTED, false));
-        Button b = UiKit.primaryButton(this, "Back to dashboard");
-        card.addView(b);
-        ll.addView(card);
-        b.setOnClickListener(v -> finish());
-        setContentView(ll);
-    }
-
     private void startTimer() {
         timer = new CountDownTimer(endAtMillis - System.currentTimeMillis(), 1000) {
             @Override public void onTick(long ms) {
@@ -173,7 +154,8 @@ public class TestActivity extends Activity {
     }
 
     private void renderQuestion(Question q) {
-        header.setText(q.difficulty + " aptitude • Question " + (index + 1) + " of " + questions.size());
+        String focus = QuestionBank.ALL_COMPANIES.equals(testCompany) ? "Mixed MNC" : testCompany;
+        header.setText(focus + " • " + q.difficulty + " aptitude • Question " + (index + 1) + " of " + questions.size());
         int answered = 0;
         for (int s : selected) if (s >= 0) answered++;
         progressText.setText("Answered " + answered + "/" + questions.size() + " • Screenshots blocked • Secure focus mode");
@@ -276,6 +258,11 @@ public class TestActivity extends Activity {
     private String answerText(Question q, int ans) {
         if (ans < 0 || ans >= q.options.length) return "Not answered";
         return (char)('A' + ans) + ". " + q.options[ans];
+    }
+
+    private int clampQuestionCount(int count) {
+        if (count < 1) return 1;
+        return Math.min(count, MAX_TEST_QUESTIONS);
     }
 
     private void showInterrupted() {

@@ -62,14 +62,18 @@ public final class ProgressStore {
     }
 
     public static int unseenCountForDifficulty(Context ctx, String difficulty) {
+        return unseenCountForPractice(ctx, difficulty, QuestionBank.ALL_COMPANIES);
+    }
+
+    public static int unseenCountForPractice(Context ctx, String difficulty, String company) {
         Set<String> askedIds = askedQuestionIds(ctx);
-        int count = 0;
-        for (Question question : QuestionBank.all()) {
-            if (question.difficulty.equalsIgnoreCase(difficulty) && !askedIds.contains(question.stableId())) {
-                count++;
-            }
+        int used = 0;
+        String prefix = difficulty + "|";
+        String selectedCompany = QuestionBank.normalizeCompany(company);
+        for (String id : askedIds) {
+            if (id.startsWith(prefix) && (QuestionBank.ALL_COMPANIES.equals(selectedCompany) || id.startsWith(prefix + selectedCompany + "|"))) used++;
         }
-        return count;
+        return Math.max(0, QuestionBank.countForDifficulty(difficulty, selectedCompany) - used);
     }
 
     public static Snapshot snapshot(Context ctx) {

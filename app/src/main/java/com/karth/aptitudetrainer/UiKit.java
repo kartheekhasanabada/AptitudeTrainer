@@ -18,37 +18,45 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public final class UiKit {
-    public static final int BG_TOP = Color.rgb(235, 244, 255);
-    public static final int BG_BOTTOM = Color.rgb(244, 238, 255);
-    public static final int INK = Color.rgb(21, 27, 38);
-    public static final int MUTED = Color.rgb(91, 102, 124);
-    public static final int HERMES_BLUE = Color.rgb(42, 96, 255);
-    public static final int HERMES_PURPLE = Color.rgb(126, 87, 255);
-    public static final int HERMES_GREEN = Color.rgb(0, 190, 140);
+    public static final int BG_TOP = Color.rgb(246, 250, 255);
+    public static final int BG_BOTTOM = Color.rgb(239, 245, 242);
+    public static final int INK = Color.rgb(18, 23, 31);
+    public static final int MUTED = Color.rgb(86, 95, 109);
+    public static final int HERMES_BLUE = Color.rgb(0, 113, 227);
+    public static final int HERMES_PURPLE = Color.rgb(112, 92, 232);
+    public static final int HERMES_GREEN = Color.rgb(0, 168, 120);
     public static final int CODE_APT_CYAN = Color.rgb(0, 180, 216);
     public static final int DANGER = Color.rgb(222, 68, 90);
 
     private UiKit() {}
 
     public static GradientDrawable screenBackground() {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{BG_TOP, Color.WHITE, BG_BOTTOM});
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{BG_TOP, Color.WHITE, BG_BOTTOM, Color.rgb(250, 248, 255)});
         g.setGradientType(GradientDrawable.LINEAR_GRADIENT);
         return g;
     }
 
     public static GradientDrawable glassCard() {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.argb(210, 255, 255, 255));
-        g.setStroke(dp(1), Color.argb(135, 255, 255, 255));
-        g.setCornerRadius(dp(28));
+        g.setColor(Color.argb(224, 255, 255, 255));
+        g.setStroke(dp(1), Color.argb(165, 255, 255, 255));
+        g.setCornerRadius(dp(8));
         return g;
     }
 
     public static GradientDrawable subtleCard() {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.argb(238, 255, 255, 255));
-        g.setStroke(dp(1), Color.argb(80, 120, 150, 210));
-        g.setCornerRadius(dp(22));
+        g.setColor(Color.argb(218, 255, 255, 255));
+        g.setStroke(dp(1), Color.argb(90, 130, 150, 190));
+        g.setCornerRadius(dp(8));
+        return g;
+    }
+
+    public static GradientDrawable inputBackground() {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.argb(190, 255, 255, 255));
+        g.setStroke(dp(1), Color.argb(120, 170, 190, 220));
+        g.setCornerRadius(dp(8));
         return g;
     }
 
@@ -91,7 +99,7 @@ public final class UiKit {
         t.setText(sb);
         t.setTextSize(responsiveSp(c, 13));
         t.setTextColor(MUTED);
-        t.setLetterSpacing(0.02f);
+        t.setLetterSpacing(0f);
         return t;
     }
 
@@ -137,7 +145,7 @@ public final class UiKit {
         int pad = contentPadding(c) - dp(2);
         card.setPadding(pad, pad, pad, pad);
         if (Build.VERSION.SDK_INT >= 16) card.setBackground(glassCard());
-        if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(8));
+        if (Build.VERSION.SDK_INT >= 21) card.setElevation(dp(3));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(10), 0, dp(10));
         card.setLayoutParams(lp);
@@ -166,7 +174,7 @@ public final class UiKit {
                 .alpha(1f)
                 .translationY(0f)
                 .setStartDelay(delayMs)
-                .setDuration(450)
+                .setDuration(520)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
     }
@@ -180,22 +188,22 @@ public final class UiKit {
                 .scaleX(1f)
                 .scaleY(1f)
                 .setStartDelay(delayMs)
-                .setDuration(380)
-                .setInterpolator(new OvershootInterpolator(0.9f))
+                .setDuration(460)
+                .setInterpolator(new OvershootInterpolator(0.55f))
                 .start();
     }
 
     public static void pulseOnce(View v) {
-        v.animate().scaleX(1.04f).scaleY(1.04f).setDuration(140).withEndAction(() ->
-                v.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
+        v.animate().scaleX(1.025f).scaleY(1.025f).setDuration(110).withEndAction(() ->
+                v.animate().scaleX(1f).scaleY(1f).setDuration(170).setInterpolator(new DecelerateInterpolator()).start()
         ).start();
     }
 
     public static void crossFadeContent(View container, Runnable updateContent) {
-        container.animate().alpha(0f).translationX(dp(8)).setDuration(160).withEndAction(() -> {
+        container.animate().alpha(0f).translationX(dp(6)).setDuration(140).withEndAction(() -> {
             updateContent.run();
-            container.setTranslationX(-dp(8));
-            container.animate().alpha(1f).translationX(0f).setDuration(240).setInterpolator(new DecelerateInterpolator()).start();
+            container.setTranslationX(-dp(6));
+            container.animate().alpha(1f).translationX(0f).setDuration(260).setInterpolator(new DecelerateInterpolator()).start();
         }).start();
     }
 

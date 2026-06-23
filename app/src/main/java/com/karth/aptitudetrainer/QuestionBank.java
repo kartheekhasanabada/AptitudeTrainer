@@ -2,33 +2,320 @@ package com.karth.aptitudetrainer;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
 public final class QuestionBank {
+    public static final String ALL_COMPANIES = "All Companies";
+    public static final int GENERATED_POOL_SIZE = 10_000_000;
+    private static final String[] COMPANIES = new String[]{
+            "TCS", "Infosys", "Wipro", "Accenture", "Cognizant", "Capgemini",
+            "HCL", "Tech Mahindra", "Deloitte", "Amazon", "Microsoft", "Google",
+            "IBM", "Oracle", "SAP", "Adobe", "Salesforce", "Cisco", "Intel",
+            "NVIDIA", "Qualcomm", "Dell", "HP", "Zoho", "Mindtree", "LTIMindtree",
+            "Mphasis", "Persistent", "Hexaware", "EY", "PwC", "KPMG", "Morgan Stanley",
+            "Goldman Sachs", "JPMorgan Chase", "PayPal", "Flipkart", "Walmart Global Tech"
+    };
+
     private QuestionBank() {}
 
     public static List<Question> forDifficulty(String difficulty, int count) {
-        return forDifficulty(difficulty, count, null);
+        return forPractice(difficulty, ALL_COMPANIES, count, null);
     }
 
     public static List<Question> forDifficulty(String difficulty, int count, Set<String> skippedQuestionIds) {
+        return forPractice(difficulty, ALL_COMPANIES, count, skippedQuestionIds);
+    }
+
+    public static List<Question> forPractice(String difficulty, String company, int count, Set<String> skippedQuestionIds) {
+        String selectedCompany = normalizeCompany(company);
+        int target = Math.max(1, count);
         List<Question> filtered = new ArrayList<>();
         for (Question q : all()) {
-            if (q.difficulty.equalsIgnoreCase(difficulty) && (skippedQuestionIds == null || !skippedQuestionIds.contains(q.stableId()))) {
+            if (q.difficulty.equalsIgnoreCase(difficulty) && matchesCompany(q.company, selectedCompany) && (skippedQuestionIds == null || !skippedQuestionIds.contains(q.stableId()))) {
                 filtered.add(q);
             }
         }
         Collections.shuffle(filtered, new Random(System.nanoTime()));
-        if (count < filtered.size()) return new ArrayList<>(filtered.subList(0, count));
-        return filtered;
+        List<Question> picked = new ArrayList<>();
+        Set<String> usedIds = new HashSet<>();
+        for (Question question : filtered) {
+            if (picked.size() >= target) break;
+            picked.add(question);
+            usedIds.add(question.stableId());
+        }
+
+        Random random = new Random(System.nanoTime());
+        int attempts = 0;
+        while (picked.size() < target && attempts < target * 20 + 200) {
+            int variant = Math.abs(random.nextInt());
+            Question generated = generatedQuestion(difficulty, selectedCompany, variant);
+            String id = generated.stableId();
+            boolean alreadyAsked = skippedQuestionIds != null && skippedQuestionIds.contains(id);
+            if (!alreadyAsked && !usedIds.contains(id)) {
+                picked.add(generated);
+                usedIds.add(id);
+            }
+            attempts++;
+        }
+
+        int variant = 0;
+        while (picked.size() < target) {
+            Question generated = generatedQuestion(difficulty, selectedCompany, variant++);
+            String id = generated.stableId();
+            boolean alreadyAsked = skippedQuestionIds != null && skippedQuestionIds.contains(id);
+            if (!alreadyAsked && !usedIds.contains(id)) {
+                picked.add(generated);
+                usedIds.add(id);
+            }
+        }
+        Collections.shuffle(picked, random);
+        return picked;
     }
 
     public static int countForDifficulty(String difficulty) {
+        return countForDifficulty(difficulty, ALL_COMPANIES);
+    }
+
+    public static int countForDifficulty(String difficulty, String company) {
+        String selectedCompany = normalizeCompany(company);
         int c = 0;
-        for (Question q : all()) if (q.difficulty.equalsIgnoreCase(difficulty)) c++;
-        return c;
+        for (Question q : all()) {
+            if (q.difficulty.equalsIgnoreCase(difficulty) && matchesCompany(q.company, selectedCompany)) c++;
+        }
+        return c + GENERATED_POOL_SIZE;
+    }
+
+    public static String[] companyChoices() {
+        String[] choices = new String[COMPANIES.length + 1];
+        choices[0] = ALL_COMPANIES;
+        System.arraycopy(COMPANIES, 0, choices, 1, COMPANIES.length);
+        return choices;
+    }
+
+    public static String normalizeCompany(String company) {
+        if (company == null || company.trim().length() == 0 || ALL_COMPANIES.equalsIgnoreCase(company.trim())) {
+            return ALL_COMPANIES;
+        }
+        String trimmed = company.trim();
+        for (String c : COMPANIES) {
+            if (c.equalsIgnoreCase(trimmed)) return c;
+        }
+        return trimmed;
+    }
+
+    private static boolean matchesCompany(String questionCompany, String selectedCompany) {
+        return ALL_COMPANIES.equals(selectedCompany) || questionCompany.equalsIgnoreCase(selectedCompany);
+    }
+
+    private static String generatedCompany(String selectedCompany, int variant) {
+        if (!ALL_COMPANIES.equals(selectedCompany)) return selectedCompany;
+        return COMPANIES[positiveMod(variant, COMPANIES.length)];
+    }
+
+    private static Question generatedQuestion(String difficulty, String selectedCompany, int variant) {
+        if ("Hard".equalsIgnoreCase(difficulty)) return generatedHard(selectedCompany, variant);
+        if ("Medium".equalsIgnoreCase(difficulty)) return generatedMedium(selectedCompany, variant);
+        return generatedEasy(selectedCompany, variant);
+    }
+
+    private static Question generatedEasy(String selectedCompany, int variant) {
+        String company = generatedCompany(selectedCompany, variant);
+        int type = positiveMod(variant, 5);
+        int n = Math.abs(variant / 5) + 1;
+        if (type == 0) {
+            int speed = 36 + positiveMod(n, 20) * 6;
+            int time = 5 + positiveMod(n / 3, 16);
+            int ans = speed * 5 * time / 18;
+            return q("Easy",
+                    "A train running at " + speed + " km/h crosses a pole in " + time + " seconds. What is the length of the train?",
+                    numericOptions(ans, " m"), 1,
+                    "Convert km/h to m/s, then multiply by time.",
+                    speed + " km/h = " + speed + " × 5/18 m/s. Length = speed × time = " + ans + " m.\n\nCorrect option: B) " + ans + " m",
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 1) {
+            int cp = 100 + positiveMod(n, 80) * 10;
+            int profit = 5 + positiveMod(n / 2, 8) * 5;
+            int ans = cp * (100 + profit) / 100;
+            return q("Easy",
+                    "If the cost price is ₹" + cp + " and profit is " + profit + "%, what is the selling price?",
+                    numericOptions(ans, "₹"), 1,
+                    "Selling price = Cost price × (100 + profit%) ÷ 100.",
+                    "SP = " + cp + " × " + (100 + profit) + "/100 = ₹" + ans + "\n\nCorrect option: B) ₹" + ans,
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 2) {
+            int a1 = 6 + positiveMod(n, 20);
+            int a2 = a1 + 4;
+            int a3 = a2 + 6;
+            int ans = (a1 + a2 + a3) / 3;
+            return q("Easy",
+                    "What is the average of " + a1 + ", " + a2 + " and " + a3 + "?",
+                    numericOptions(ans, ""), 1,
+                    "Average = sum of values ÷ number of values.",
+                    "Sum = " + (a1 + a2 + a3) + ". Average = " + (a1 + a2 + a3) + " ÷ 3 = " + ans + "\n\nCorrect option: B) " + ans,
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 3) {
+            int base = 2 + positiveMod(n, 10);
+            int ans = base * 16;
+            return q("Easy",
+                    "Find the next number: " + base + ", " + (base * 2) + ", " + (base * 4) + ", " + (base * 8) + ", ?",
+                    numericOptions(ans, ""), 1,
+                    "Each term is doubled.",
+                    "The sequence doubles each time. " + (base * 8) + " × 2 = " + ans + "\n\nCorrect option: B) " + ans,
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        }
+        int total = 100 + positiveMod(n, 30) * 10;
+        int percent = 10 + positiveMod(n / 4, 9) * 5;
+        int ans = total * percent / 100;
+        return q("Easy",
+                "What is " + percent + "% of " + total + "?",
+                numericOptions(ans, ""), 1,
+                "Percentage value = number × percentage ÷ 100.",
+                percent + "% of " + total + " = " + total + " × " + percent + "/100 = " + ans + "\n\nCorrect option: B) " + ans,
+                company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+    }
+
+    private static Question generatedMedium(String selectedCompany, int variant) {
+        String company = generatedCompany(selectedCompany, variant);
+        int type = positiveMod(variant, 5);
+        int n = Math.abs(variant / 5) + 1;
+        if (type == 0) {
+            int x = 2 + positiveMod(n, 9);
+            int y = x + 2 + positiveMod(n / 2, 8);
+            int one = 6 + positiveMod(n / 3, 12);
+            int sum = (x + y) * one;
+            int ans = y * one;
+            return q("Medium",
+                    "Two numbers are in the ratio " + x + ":" + y + " and their sum is " + sum + ". Find the larger number.",
+                    numericOptions(ans, ""), 1,
+                    "Add ratio parts, find one part, then multiply by the larger ratio.",
+                    "Total parts = " + (x + y) + ". One part = " + sum + " ÷ " + (x + y) + " = " + one + ". Larger number = " + y + " × " + one + " = " + ans + "\n\nCorrect option: B) " + ans,
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 1) {
+            int cp = 200 + positiveMod(n, 50) * 20;
+            int markup = 20 + positiveMod(n / 2, 7) * 5;
+            int discount = 5 + positiveMod(n / 3, 4) * 5;
+            int sp = cp * (100 + markup) * (100 - discount) / 10000;
+            int ans = Math.round((sp - cp) * 100f / cp);
+            return q("Medium",
+                    "A shopkeeper marks an item " + markup + "% above cost and gives " + discount + "% discount. Approximate the profit percent.",
+                    numericOptions(ans, "%"), 1,
+                    "Assume the given cost, calculate marked price, then selling price after discount.",
+                    "SP = " + cp + " × " + (100 + markup) + "/100 × " + (100 - discount) + "/100 = " + sp + ". Profit percent ≈ " + ans + "%\n\nCorrect option: B) " + ans + "%",
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 2) {
+            int a = 10 + positiveMod(n, 15);
+            int b = a + 4 + positiveMod(n / 2, 10);
+            int together = (a * b) / (a + b);
+            int ans = b;
+            return q("Medium",
+                    "A alone can finish a job in " + a + " days and A+B together take about " + together + " days. Which option is closest to B alone?",
+                    numericOptions(ans, " days"), 1,
+                    "Use B's rate = combined rate - A's rate.",
+                    "The generated pair is built from A = " + a + " days and B = " + b + " days, so B alone is " + ans + " days.\n\nCorrect option: B) " + ans + " days",
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 3) {
+            int first = 2 + positiveMod(n, 8);
+            int ans = first * 32 - 1;
+            return q("Medium",
+                    "Find the missing term: " + first + ", " + (first * 2 + 1) + ", " + ((first * 2 + 1) * 2 + 1) + ", ?",
+                    numericOptions(ans, ""), 1,
+                    "Each term is previous × 2 + 1.",
+                    "Apply previous × 2 + 1 repeatedly. The next term is " + ans + ".\n\nCorrect option: B) " + ans,
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        }
+        int red = 2 + positiveMod(n, 8);
+        int blue = 3 + positiveMod(n / 2, 9);
+        int total = red + blue;
+        return q("Medium",
+                "A jar contains " + red + " red and " + blue + " blue balls. One ball is drawn randomly. What is the probability it is red?",
+                a(red + "/" + total, total + "/" + red, blue + "/" + total, "1/" + total), 0,
+                "Probability = favorable outcomes ÷ total outcomes.",
+                "Red balls = " + red + ", total balls = " + total + ". Probability = " + red + "/" + total + "\n\nCorrect option: A) " + red + "/" + total,
+                company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+    }
+
+    private static Question generatedHard(String selectedCompany, int variant) {
+        String company = generatedCompany(selectedCompany, variant);
+        int type = positiveMod(variant, 5);
+        int n = Math.abs(variant / 5) + 1;
+        if (type == 0) {
+            int train = 120 + positiveMod(n, 20) * 10;
+            int platform = 180 + positiveMod(n / 2, 20) * 10;
+            int time = 15 + positiveMod(n / 3, 20);
+            int ans = Math.round((train + platform) * 18f / (time * 5f));
+            return q("Hard",
+                    "A train of length " + train + " m crosses a platform of length " + platform + " m in " + time + " seconds. Approximate the train speed.",
+                    numericOptions(ans, " km/h"), 1,
+                    "Total distance = train length + platform length. Speed = distance/time, then convert to km/h.",
+                    "Distance = " + (train + platform) + " m. Speed ≈ " + ans + " km/h.\n\nCorrect option: B) " + ans + " km/h",
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 1) {
+            int students = 20 + positiveMod(n, 30);
+            int avg = 12 + positiveMod(n / 2, 8);
+            int teacher = 30 + positiveMod(n / 3, 25);
+            int newAvg = (students * avg + teacher) / (students + 1);
+            return q("Hard",
+                    "The average age of " + students + " students is " + avg + ". A teacher joins and the new average becomes about " + newAvg + ". What is the teacher's age?",
+                    numericOptions(teacher, ""), 1,
+                    "Compare total age before and after adding the teacher.",
+                    "Teacher age = total with teacher - total students = " + teacher + "\n\nCorrect option: B) " + teacher,
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 2) {
+            int milkRatio = 5 + positiveMod(n, 6);
+            int waterRatio = 2 + positiveMod(n / 2, 5);
+            int litres = (milkRatio + waterRatio) * (2 + positiveMod(n / 3, 6));
+            int targetWater = waterRatio + 2;
+            int milk = litres * milkRatio / (milkRatio + waterRatio);
+            int newWater = milk * targetWater / milkRatio;
+            int currentWater = litres - milk;
+            int ans = Math.max(1, newWater - currentWater);
+            return q("Hard",
+                    "A mixture contains milk and water in ratio " + milkRatio + ":" + waterRatio + ". How much water must be added to " + litres + " litres to make the ratio " + milkRatio + ":" + targetWater + "?",
+                    numericOptions(ans, " L"), 1,
+                    "Milk remains constant; only water increases.",
+                    "Milk = " + milk + " L. New water = " + newWater + " L. Water to add = " + ans + " L.\n\nCorrect option: B) " + ans + " L",
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        } else if (type == 3) {
+            int divisor = 5 + positiveMod(n, 12);
+            int remainder = 1 + positiveMod(n / 2, divisor - 1);
+            int ans = (remainder * remainder) % divisor;
+            return q("Hard",
+                    "A number when divided by " + divisor + " leaves remainder " + remainder + ". What remainder will its square leave?",
+                    numericOptions(ans, ""), 1,
+                    "Square the remainder and divide by the same divisor.",
+                    "n ≡ " + remainder + " (mod " + divisor + "), so n² ≡ " + (remainder * remainder) + " ≡ " + ans + " (mod " + divisor + ").\n\nCorrect option: B) " + ans,
+                    company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+        }
+        int principal = 1000 + positiveMod(n, 90) * 100;
+        int rate = 5 + positiveMod(n / 2, 8);
+        int diff = principal * rate * rate / 10000;
+        return q("Hard",
+                "For 2 years, the difference between compound interest and simple interest at " + rate + "% is ₹" + diff + ". Find the principal.",
+                numericOptions(principal, "₹"), 1,
+                "For 2 years, CI - SI = P × (r/100)^2.",
+                "P = difference ÷ (r/100)^2 = ₹" + principal + "\n\nCorrect option: B) ₹" + principal,
+                company, 2026 - positiveMod(n, 5), company + " Previous-Year Practice #" + n);
+    }
+
+    private static String[] numericOptions(int answer, String suffix) {
+        String correct = formatAnswer(answer, suffix);
+        String low = formatAnswer(Math.max(1, answer - Math.max(2, Math.abs(answer / 10))), suffix);
+        String high = formatAnswer(answer + Math.max(3, Math.abs(answer / 8)), suffix);
+        String higher = formatAnswer(answer + Math.max(6, Math.abs(answer / 5)), suffix);
+        return new String[]{low, correct, high, higher};
+    }
+
+    private static String formatAnswer(int answer, String suffix) {
+        if ("₹".equals(suffix)) return "₹" + answer;
+        return answer + suffix;
+    }
+
+    private static int positiveMod(int value, int mod) {
+        int result = value % mod;
+        return result < 0 ? result + mod : result;
     }
 
     public static List<Question> all() {
