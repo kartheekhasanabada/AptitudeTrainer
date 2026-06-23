@@ -18,8 +18,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public final class UiKit {
-    public static final int BG_TOP = Color.rgb(238, 247, 255);
-    public static final int BG_BOTTOM = Color.rgb(240, 249, 245);
+    public static final int BG_TOP = Color.rgb(224, 242, 255);
+    public static final int BG_BOTTOM = Color.rgb(227, 250, 241);
     public static final int INK = Color.rgb(18, 23, 31);
     public static final int MUTED = Color.rgb(86, 95, 109);
     public static final int HERMES_BLUE = Color.rgb(0, 113, 227);
@@ -33,7 +33,12 @@ public final class UiKit {
     private UiKit() {}
 
     public static GradientDrawable screenBackground() {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{BG_TOP, Color.WHITE, Color.rgb(244, 241, 255), BG_BOTTOM});
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
+                Color.rgb(213, 236, 255),
+                Color.rgb(244, 238, 255),
+                Color.rgb(222, 250, 241),
+                Color.rgb(255, 244, 224)
+        });
         g.setGradientType(GradientDrawable.LINEAR_GRADIENT);
         return g;
     }
@@ -54,10 +59,22 @@ public final class UiKit {
         return g;
     }
 
-    public static GradientDrawable learningGlass(int accent) {
+    public static GradientDrawable dashboardGlass() {
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
-                Color.argb(232, 255, 255, 255),
-                Color.argb(176, Color.red(blend(accent, Color.WHITE, 0.72f)), Color.green(blend(accent, Color.WHITE, 0.72f)), Color.blue(blend(accent, Color.WHITE, 0.72f)))
+                Color.argb(232, 221, 239, 255),
+                Color.argb(222, 232, 224, 255),
+                Color.argb(220, 220, 250, 238)
+        });
+        g.setStroke(dp(1), Color.argb(190, 255, 255, 255));
+        g.setCornerRadius(dp(8));
+        return g;
+    }
+
+    public static GradientDrawable learningGlass(int accent) {
+        int mixed = blend(accent, Color.WHITE, 0.58f);
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
+                Color.argb(225, 255, 255, 255),
+                Color.argb(215, Color.red(mixed), Color.green(mixed), Color.blue(mixed))
         });
         g.setStroke(dp(1), Color.argb(150, 255, 255, 255));
         g.setCornerRadius(dp(8));
@@ -79,8 +96,10 @@ public final class UiKit {
     }
 
     public static GradientDrawable outlinePill() {
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.argb(188, 255, 255, 255));
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{
+                Color.argb(222, 255, 255, 255),
+                Color.argb(185, 224, 238, 255)
+        });
         g.setStroke(dp(1), Color.argb(120, 0, 113, 227));
         g.setCornerRadius(dp(999));
         return g;
@@ -189,7 +208,7 @@ public final class UiKit {
         LinearLayout box = new LinearLayout(c);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(12), dp(10), dp(12), dp(10));
-        if (Build.VERSION.SDK_INT >= 16) box.setBackground(subtleCard());
+        if (Build.VERSION.SDK_INT >= 16) box.setBackground(learningGlass(accent));
         TextView v = text(c, value, 24, accent, true);
         TextView l = text(c, label, 12, MUTED, true);
         box.addView(v);

@@ -108,6 +108,7 @@ public class MainActivity extends Activity {
         UiKit.scalePopIn(hero, 0);
 
         dashboardCard = UiKit.card(this);
+        if (Build.VERSION.SDK_INT >= 16) dashboardCard.setBackground(UiKit.dashboardGlass());
         root.addView(dashboardCard);
         refreshDashboard();
         UiKit.fadeSlideIn(dashboardCard, 80);
@@ -224,8 +225,10 @@ public class MainActivity extends Activity {
     private void refreshDashboard() {
         dashboardCard.removeAllViews();
         ProgressStore.Snapshot p = ProgressStore.snapshot(this);
-        dashboardCard.addView(UiKit.text(this, "Learning Dashboard", 24, UiKit.INK, true));
-        dashboardCard.addView(UiKit.text(this, "A clean practice view for consistency, focus, and interview readiness.", 14, UiKit.MUTED, false));
+        TextView dashTitle = UiKit.text(this, "Learning Dashboard", 24, UiKit.INK, true);
+        TextView dashSub = UiKit.text(this, "A colorful glass view for consistency, focus, and interview readiness.", 14, UiKit.MUTED, false);
+        dashboardCard.addView(dashTitle);
+        dashboardCard.addView(dashSub);
 
         LinearLayout focus = new LinearLayout(this);
         focus.setOrientation(LinearLayout.VERTICAL);
@@ -262,6 +265,16 @@ public class MainActivity extends Activity {
         TextView last = UiKit.text(this, "Last test: " + p.lastDifficulty + " • " + (p.lastTotal == 0 ? "No score yet" : p.lastScore + "/" + p.lastTotal + " (" + p.lastPercent + "%)") + "\n" + p.lastTime, 14, UiKit.MUTED, false);
         last.setPadding(0, UiKit.dp(10), 0, UiKit.dp(6));
         dashboardCard.addView(last);
+
+        LinearLayout progressPanel = new LinearLayout(this);
+        progressPanel.setOrientation(LinearLayout.VERTICAL);
+        progressPanel.setPadding(UiKit.dp(14), UiKit.dp(12), UiKit.dp(14), UiKit.dp(12));
+        if (Build.VERSION.SDK_INT >= 16) progressPanel.setBackground(UiKit.learningGlass(p.averagePercent >= 70 ? UiKit.HERMES_GREEN : UiKit.LEARNING_GOLD));
+        progressPanel.addView(UiKit.text(this, "Progress Glow", 13, UiKit.MUTED, true));
+        progressPanel.addView(UiKit.text(this, p.averagePercent + "% average accuracy", 20, p.averagePercent >= 70 ? UiKit.HERMES_GREEN : UiKit.LEARNING_GOLD, true));
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, -2);
+        progressLp.setMargins(0, UiKit.dp(8), 0, UiKit.dp(8));
+        dashboardCard.addView(progressPanel, progressLp);
 
         ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         bar.setMax(100);
