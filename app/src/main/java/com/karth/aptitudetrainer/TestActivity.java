@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.NotificationManager;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,9 +30,11 @@ public class TestActivity extends Activity {
     private String testDifficulty = "Easy";
     private CountDownTimer timer;
     private LinearLayout root;
+    private LinearLayout questionCard;
     private TextView header;
     private TextView timerView;
     private TextView questionView;
+    private TextView sourceView;
     private TextView progressText;
     private RadioGroup optionsGroup;
     private Button prevBtn;
@@ -49,7 +50,12 @@ public class TestActivity extends Activity {
         SharedPreferences sp = getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE);
         testDifficulty = sp.getString("difficulty", "Easy");
         int count = sp.getInt("count", 5);
-        questions = QuestionBank.forDifficulty(testDifficulty, count);
+        questions = QuestionBank.forDifficulty(testDifficulty, count, ProgressStore.askedQuestionIds(this));
+        if (questions.isEmpty()) {
+            showNoFreshQuestions();
+            return;
+        }
+        ProgressStore.recordAskedQuestions(this, questions);
         selected = new int[questions.size()];
         for (int i = 0; i < selected.length; i++) selected[i] = -1;
         endAtMillis = System.currentTimeMillis() + Math.max(questions.size(), 1) * 60_000L;
@@ -57,39 +63,54 @@ public class TestActivity extends Activity {
         sp.edit().putBoolean("test_active", true).putBoolean("test_interrupted", false).apply();
         try { startLockTask(); Toast.makeText(this, "Focus mode started. Finish the test to exit.", Toast.LENGTH_LONG).show(); } catch (Exception ignored) {}
         buildTestUi();
-        showQuestion();
+        showQuestion(false);
         startTimer();
     }
 
     private void buildTestUi() {
         ScrollView sv = new ScrollView(this);
+        sv.setFillViewport(true);
         if (Build.VERSION.SDK_INT >= 16) sv.setBackground(UiKit.screenBackground());
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(UiKit.dp(20), UiKit.dp(22), UiKit.dp(20), UiKit.dp(28));
+        int pad = UiKit.contentPadding(this);
+        root.setPadding(pad, UiKit.dp(22), pad, UiKit.dp(28));
         sv.addView(root);
 
         LinearLayout top = UiKit.card(this);
         header = UiKit.text(this, "", 22, UiKit.INK, true);
         timerView = UiKit.text(this, "", 16, UiKit.HERMES_PURPLE, true);
         progressText = UiKit.text(this, "", 13, UiKit.MUTED, false);
-        top.addView(UiKit.text(this, "FOCUS TEST", 12, UiKit.HERMES_BLUE, true));
+        top.addView(UiKit.poweredByLabel(this));
         top.addView(header);
         top.addView(timerView);
         top.addView(progressText);
         root.addView(top);
+        UiKit.fadeSlideIn(top, 0);
 
-        LinearLayout qCard = UiKit.card(this);
+        questionCard = UiKit.card(this);
         questionView = UiKit.text(this, "", 19, UiKit.INK, true);
-        qCard.addView(questionView);
+        sourceView = UiKit.text(this, "", 13, UiKit.CODE_APT_CYAN, true);
+        sourceView.setPadding(0, UiKit.dp(8), 0, UiKit.dp(4));
+        questionCard.addView(questionView);
+        questionCard.addView(sourceView);
         optionsGroup = new RadioGroup(this);
         optionsGroup.setOrientation(RadioGroup.VERTICAL);
-        qCard.addView(optionsGroup);
-        root.addView(qCard);
+        questionCard.addView(optionsGroup);
+        root.addView(questionCard);
+        UiKit.fadeSlideIn(questionCard, 100);
 
         Button hintBtn = UiKit.secondaryButton(this, "Show hint");
         root.addView(hintBtn);
-        hintBtn.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("Hint").setMessage(questions.get(index).hint).setPositiveButton("OK", null).show());
+        hintBtn.setOnClickListener(v -> {
+            UiKit.pulseOnce(hintBtn);
+            Question q = questions.get(index);
+            new AlertDialog.Builder(this)
+                    .setTitle("Hint")
+                    .setMessage(q.hint + "\n\nSource: " + q.sourceLabel())
+                    .setPositiveButton("OK", null)
+                    .show();
+        });
 
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER);
@@ -104,10 +125,28 @@ public class TestActivity extends Activity {
         finishBtn = UiKit.primaryButton(this, "Finish test");
         root.addView(finishBtn);
 
-        prevBtn.setOnClickListener(v -> { saveSelected(); if (index > 0) { index--; showQuestion(); }});
-        nextBtn.setOnClickListener(v -> { saveSelected(); if (index < questions.size()-1) { index++; showQuestion(); }});
-        finishBtn.setOnClickListener(v -> confirmFinish());
+        prevBtn.setOnClickListener(v -> { saveSelected(); if (index > 0) { index--; showQuestion(true); }});
+        nextBtn.setOnClickListener(v -> { saveSelected(); if (index < questions.size() - 1) { index++; showQuestion(true); }});
+        finishBtn.setOnClickListener(v -> { UiKit.pulseOnce(finishBtn); confirmFinish(); });
         setContentView(sv);
+    }
+
+    private void showNoFreshQuestions() {
+        completed = true;
+        active = false;
+        LinearLayout ll = new LinearLayout(this);
+        if (Build.VERSION.SDK_INT >= 16) ll.setBackground(UiKit.screenBackground());
+        ll.setOrientation(LinearLayout.VERTICAL);
+        ll.setPadding(UiKit.dp(30), UiKit.dp(36), UiKit.dp(30), UiKit.dp(36));
+        LinearLayout card = UiKit.card(this);
+        card.addView(UiKit.poweredByLabel(this));
+        card.addView(UiKit.text(this, "No new questions left", 28, UiKit.INK, true));
+        card.addView(UiKit.text(this, "You have already seen every " + testDifficulty + " question in this app, so this test was not started.", 16, UiKit.MUTED, false));
+        Button b = UiKit.primaryButton(this, "Back to dashboard");
+        card.addView(b);
+        ll.addView(card);
+        b.setOnClickListener(v -> finish());
+        setContentView(ll);
     }
 
     private void startTimer() {
@@ -124,27 +163,37 @@ public class TestActivity extends Activity {
         timer.start();
     }
 
-    private void showQuestion() {
-        Question q = questions.get(index);
+    private void showQuestion(boolean animate) {
+        Runnable update = () -> renderQuestion(questions.get(index));
+        if (animate) {
+            UiKit.crossFadeContent(questionCard, update);
+        } else {
+            update.run();
+        }
+    }
+
+    private void renderQuestion(Question q) {
         header.setText(q.difficulty + " aptitude • Question " + (index + 1) + " of " + questions.size());
         int answered = 0;
         for (int s : selected) if (s >= 0) answered++;
         progressText.setText("Answered " + answered + "/" + questions.size() + " • Screenshots blocked • Secure focus mode");
         questionView.setText(q.text);
+        sourceView.setText(q.sourceLabel());
         optionsGroup.removeAllViews();
-        for (int i=0; i<q.options.length; i++) {
+        for (int i = 0; i < q.options.length; i++) {
             RadioButton rb = new RadioButton(this);
             rb.setText((char)('A' + i) + ". " + q.options[i]);
-            rb.setTextSize(16);
+            rb.setTextSize(UiKit.responsiveSp(this, 16));
             rb.setTextColor(UiKit.INK);
             rb.setTypeface(Typeface.DEFAULT_BOLD);
             rb.setId(100 + i);
             rb.setPadding(UiKit.dp(8), UiKit.dp(14), UiKit.dp(8), UiKit.dp(14));
             optionsGroup.addView(rb);
+            UiKit.fadeSlideIn(rb, 40L * i);
         }
         if (selected[index] >= 0) optionsGroup.check(100 + selected[index]); else optionsGroup.clearCheck();
         prevBtn.setEnabled(index > 0);
-        nextBtn.setEnabled(index < questions.size()-1);
+        nextBtn.setEnabled(index < questions.size() - 1);
     }
 
     private void saveSelected() {
@@ -157,7 +206,7 @@ public class TestActivity extends Activity {
         int unanswered = 0;
         for (int s : selected) if (s < 0) unanswered++;
         String msg = unanswered == 0 ? "Submit your answers now?" : "You have " + unanswered + " unanswered question(s). Submit anyway?";
-        new AlertDialog.Builder(this).setTitle("Finish test").setMessage(msg).setNegativeButton("Continue test", null).setPositiveButton("Submit", (d,w) -> finishTest()).show();
+        new AlertDialog.Builder(this).setTitle("Finish test").setMessage(msg).setNegativeButton("Continue test", null).setPositiveButton("Submit", (d, w) -> finishTest()).show();
     }
 
     private void finishTest() {
@@ -175,16 +224,18 @@ public class TestActivity extends Activity {
 
     private int calculateScore() {
         int score = 0;
-        for (int i=0; i<questions.size(); i++) if (selected[i] == questions.get(i).answerIndex) score++;
+        for (int i = 0; i < questions.size(); i++) if (selected[i] == questions.get(i).answerIndex) score++;
         return score;
     }
 
     private void showResults(int score) {
         ScrollView sv = new ScrollView(this);
+        sv.setFillViewport(true);
         if (Build.VERSION.SDK_INT >= 16) sv.setBackground(UiKit.screenBackground());
         LinearLayout rr = new LinearLayout(this);
         rr.setOrientation(LinearLayout.VERTICAL);
-        rr.setPadding(UiKit.dp(20), UiKit.dp(22), UiKit.dp(20), UiKit.dp(28));
+        int pad = UiKit.contentPadding(this);
+        rr.setPadding(pad, UiKit.dp(22), pad, UiKit.dp(28));
         sv.addView(rr);
 
         int percent = questions.isEmpty() ? 0 : Math.round(score * 100f / questions.size());
@@ -195,19 +246,30 @@ public class TestActivity extends Activity {
         summary.addView(scoreView);
         summary.addView(UiKit.text(this, "Your dashboard has been updated.", 14, UiKit.MUTED, false));
         rr.addView(summary);
+        UiKit.scalePopIn(summary, 0);
 
-        for (int i=0; i<questions.size(); i++) {
+        for (int i = 0; i < questions.size(); i++) {
             Question q = questions.get(i);
             LinearLayout item = UiKit.card(this);
             boolean ok = selected[i] == q.answerIndex;
-            item.addView(UiKit.text(this, (ok ? "✓ Correct" : "✕ Review") + " • Q" + (i+1), 16, ok ? UiKit.HERMES_GREEN : UiKit.DANGER, true));
+            item.addView(UiKit.text(this, (ok ? "✓ Correct" : "✕ Review") + " • Q" + (i + 1), 16, ok ? UiKit.HERMES_GREEN : UiKit.DANGER, true));
             item.addView(UiKit.text(this, q.text, 15, UiKit.INK, true));
-            item.addView(UiKit.text(this, "Your answer: " + answerText(q, selected[i]) + "\nCorrect answer: " + answerText(q, q.answerIndex) + "\nExplanation: " + q.explanation, 14, UiKit.MUTED, false));
+            item.addView(UiKit.text(this, q.sourceLabel(), 12, UiKit.CODE_APT_CYAN, true));
+            item.addView(UiKit.text(this, "Your answer: " + answerText(q, selected[i]), 14, UiKit.MUTED, false));
+            item.addView(UiKit.text(this, "Correct answer: " + answerText(q, q.answerIndex), 14, UiKit.HERMES_GREEN, true));
+            TextView expTitle = UiKit.text(this, "Step-by-step explanation", 14, UiKit.INK, true);
+            expTitle.setPadding(0, UiKit.dp(8), 0, UiKit.dp(4));
+            item.addView(expTitle);
+            item.addView(UiKit.text(this, q.explanation, 14, UiKit.MUTED, false));
             rr.addView(item);
+            UiKit.fadeSlideIn(item, 60L * i);
         }
         Button done = UiKit.primaryButton(this, "Back to dashboard");
         rr.addView(done);
-        done.setOnClickListener(v -> finish());
+        done.setOnClickListener(v -> {
+            finish();
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        });
         setContentView(sv);
     }
 

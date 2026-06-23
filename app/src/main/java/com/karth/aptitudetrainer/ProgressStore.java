@@ -4,11 +4,15 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import java.text.SimpleDateFormat;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Set;
 
 public final class ProgressStore {
     private static final String PREFS = Scheduler.PREFS;
+    private static final String ASKED_QUESTION_IDS = "asked_question_ids";
 
     private ProgressStore() {}
 
@@ -38,6 +42,34 @@ public final class ProgressStore {
     public static void recordInterrupted(Context ctx) {
         SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         sp.edit().putInt("progress_interrupted", sp.getInt("progress_interrupted", 0) + 1).apply();
+    }
+
+    public static Set<String> askedQuestionIds(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return new HashSet<>(sp.getStringSet(ASKED_QUESTION_IDS, new HashSet<String>()));
+    }
+
+    public static void recordAskedQuestions(Context ctx, List<Question> questions) {
+        if (questions == null || questions.isEmpty()) return;
+        Set<String> ids = askedQuestionIds(ctx);
+        for (Question question : questions) {
+            ids.add(question.stableId());
+        }
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putStringSet(ASKED_QUESTION_IDS, ids)
+                .apply();
+    }
+
+    public static int unseenCountForDifficulty(Context ctx, String difficulty) {
+        Set<String> askedIds = askedQuestionIds(ctx);
+        int count = 0;
+        for (Question question : QuestionBank.all()) {
+            if (question.difficulty.equalsIgnoreCase(difficulty) && !askedIds.contains(question.stableId())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public static Snapshot snapshot(Context ctx) {

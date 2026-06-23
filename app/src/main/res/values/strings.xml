@@ -1,1 +1,7 @@
-<resources><string name="app_name">Aptitude Trainer</string><color name="primary">#1B365D</color><color name="accent">#00A676</color></resources>
+<resources>
+    <string name="app_name">Aptitude Trainer</string>
+    <color name="primary">#1B365D</color>
+    <color name="accent">#00B4D8</color>
+    <color name="launcher_bg">#FFFFFF</color>
+    <color name="codeapt_cyan">#00B4D8</color>
+</resources>

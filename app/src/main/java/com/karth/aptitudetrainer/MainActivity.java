@@ -16,6 +16,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -68,24 +69,42 @@ public class MainActivity extends Activity {
 
     private void buildUi() {
         ScrollView sv = new ScrollView(this);
+        sv.setFillViewport(true);
         if (Build.VERSION.SDK_INT >= 16) sv.setBackground(UiKit.screenBackground());
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(UiKit.dp(20), UiKit.dp(22), UiKit.dp(20), UiKit.dp(28));
+        int pad = UiKit.contentPadding(this);
+        root.setPadding(pad, UiKit.dp(22), pad, UiKit.dp(28));
         sv.addView(root);
 
         LinearLayout hero = UiKit.card(this);
-        TextView eyebrow = UiKit.text(this, "HERMES × GLASS LEARNING", 12, UiKit.HERMES_BLUE, true);
+        LinearLayout brandRow = new LinearLayout(this);
+        brandRow.setOrientation(LinearLayout.HORIZONTAL);
+        brandRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageView logo = UiKit.appLogo(this);
+        LinearLayout brandText = new LinearLayout(this);
+        brandText.setOrientation(LinearLayout.VERTICAL);
+        brandText.setPadding(UiKit.dp(12), 0, 0, 0);
+        brandText.addView(UiKit.poweredByLabel(this));
+        brandRow.addView(logo);
+        brandRow.addView(brandText, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
         TextView title = UiKit.text(this, "Aptitude Trainer", 34, UiKit.INK, true);
-        TextView subtitle = UiKit.text(this, "Daily interview-style practice with secure scheduled tests, hints, explanations and progress tracking.", 15, UiKit.MUTED, false);
-        hero.addView(eyebrow);
+        title.setPadding(0, UiKit.dp(14), 0, 0);
+        TextView subtitle = UiKit.text(this, "Daily interview-style practice with secure scheduled tests, hints, step-by-step explanations and progress tracking.", 15, UiKit.MUTED, false);
+        subtitle.setPadding(0, UiKit.dp(6), 0, 0);
+
+        hero.addView(brandRow);
         hero.addView(title);
         hero.addView(subtitle);
         root.addView(hero);
+        UiKit.scalePopIn(hero, 0);
 
         dashboardCard = UiKit.card(this);
         root.addView(dashboardCard);
         refreshDashboard();
+        UiKit.fadeSlideIn(dashboardCard, 80);
 
         LinearLayout scheduleCard = UiKit.card(this);
         scheduleCard.addView(UiKit.text(this, "Daily Test Setup", 22, UiKit.INK, true));
@@ -97,16 +116,20 @@ public class MainActivity extends Activity {
 
         Button timeBtn = UiKit.secondaryButton(this, String.format("Choose daily time: %02d:%02d", selectedHour, selectedMinute));
         scheduleCard.addView(timeBtn);
-        timeBtn.setOnClickListener(v -> new TimePickerDialog(this, (view, hour, minute) -> {
-            selectedHour = hour; selectedMinute = minute;
-            timeBtn.setText(String.format("Choose daily time: %02d:%02d", selectedHour, selectedMinute));
-        }, selectedHour, selectedMinute, true).show());
+        timeBtn.setOnClickListener(v -> {
+            UiKit.pulseOnce(timeBtn);
+            new TimePickerDialog(this, (view, hour, minute) -> {
+                selectedHour = hour;
+                selectedMinute = minute;
+                timeBtn.setText(String.format("Choose daily time: %02d:%02d", selectedHour, selectedMinute));
+            }, selectedHour, selectedMinute, true).show();
+        });
 
         scheduleCard.addView(sectionLabel("Difficulty level"));
         Spinner difficulty = new Spinner(this);
         String[] diffs = new String[]{"Easy", "Medium", "Hard"};
         difficulty.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, diffs));
-        for (int i=0; i<diffs.length; i++) if (diffs[i].equals(selectedDifficulty)) difficulty.setSelection(i);
+        for (int i = 0; i < diffs.length; i++) if (diffs[i].equals(selectedDifficulty)) difficulty.setSelection(i);
         scheduleCard.addView(difficulty);
         difficulty.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { selectedDifficulty = diffs[position]; updateCountHint(); }
@@ -137,22 +160,27 @@ public class MainActivity extends Activity {
         scheduleCard.addView(actions);
 
         save.setOnClickListener(v -> {
+            UiKit.pulseOnce(save);
             Scheduler.saveSchedule(this, selectedHour, selectedMinute, selectedDifficulty, selectedCount);
             scheduleText.setText(Scheduler.scheduleSummary(this));
             Toast.makeText(this, "Daily test scheduled securely", Toast.LENGTH_LONG).show();
         });
         startNow.setOnClickListener(v -> {
+            UiKit.pulseOnce(startNow);
             getSharedPreferences(Scheduler.PREFS, MODE_PRIVATE).edit().putString("difficulty", selectedDifficulty).putInt("count", selectedCount).apply();
             Intent it = new Intent(this, TestActivity.class);
             it.putExtra("scheduled", false);
             startActivity(it);
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         });
         root.addView(scheduleCard);
+        UiKit.fadeSlideIn(scheduleCard, 160);
 
         LinearLayout security = UiKit.card(this);
         security.addView(UiKit.text(this, "Security Mode", 20, UiKit.INK, true));
         security.addView(UiKit.text(this, "No internet permission • private storage • screenshots blocked during tests • exact alarms • best-effort screen pinning.", 14, UiKit.MUTED, false));
         root.addView(security);
+        UiKit.fadeSlideIn(security, 240);
 
         setContentView(sv);
     }
@@ -189,7 +217,11 @@ public class MainActivity extends Activity {
     }
 
     private void updateCountHint() {
-        if (countHint != null) countHint.setText("Available " + selectedDifficulty + " questions: " + QuestionBank.countForDifficulty(selectedDifficulty) + ". Questions are shuffled each test.");
+        if (countHint != null) {
+            int total = QuestionBank.countForDifficulty(selectedDifficulty);
+            int fresh = ProgressStore.unseenCountForDifficulty(this, selectedDifficulty);
+            countHint.setText("New " + selectedDifficulty + " questions left: " + fresh + "/" + total + ". Seen questions will not be asked again.");
+        }
     }
 
     private TextView sectionLabel(String s) { TextView t = UiKit.text(this, s, 15, UiKit.INK, true); t.setPadding(0, UiKit.dp(18), 0, UiKit.dp(6)); return t; }
