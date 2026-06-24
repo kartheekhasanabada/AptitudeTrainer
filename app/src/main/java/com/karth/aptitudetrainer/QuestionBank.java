@@ -72,7 +72,11 @@ public final class QuestionBank {
             }
         }
         Collections.shuffle(picked, random);
-        return picked;
+        List<Question> randomized = new ArrayList<>();
+        for (Question question : picked) {
+            randomized.add(shuffleOptions(question, random));
+        }
+        return randomized;
     }
 
     public static int countForDifficulty(String difficulty) {
@@ -306,6 +310,30 @@ public final class QuestionBank {
         String high = formatAnswer(answer + Math.max(3, Math.abs(answer / 8)), suffix);
         String higher = formatAnswer(answer + Math.max(6, Math.abs(answer / 5)), suffix);
         return new String[]{low, correct, high, higher};
+    }
+
+    private static Question shuffleOptions(Question question, Random random) {
+        List<Integer> order = new ArrayList<>();
+        for (int i = 0; i < question.options.length; i++) order.add(i);
+        Collections.shuffle(order, random);
+        String[] shuffled = new String[question.options.length];
+        int newAnswerIndex = 0;
+        for (int i = 0; i < order.size(); i++) {
+            int oldIndex = order.get(i);
+            shuffled[i] = question.options[oldIndex];
+            if (oldIndex == question.answerIndex) newAnswerIndex = i;
+        }
+        return new Question(
+                question.difficulty,
+                question.text,
+                shuffled,
+                newAnswerIndex,
+                question.hint,
+                question.explanation,
+                question.company,
+                question.year,
+                question.testName
+        );
     }
 
     private static String formatAnswer(int answer, String suffix) {
